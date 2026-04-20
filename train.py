@@ -1,4 +1,4 @@
-# Authors: Yu Cao, Fan Zhang, Na Yin
+# Authors: Yu Cao, Na Yin, Fan Zhang
 # Date: April 2026
 # Purpose: Training script for NutriScan YOLOv8s model
 #          on the UEC FOOD-256 dataset with class

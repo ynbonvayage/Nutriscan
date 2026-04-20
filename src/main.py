@@ -1,4 +1,4 @@
-# Authors: Yu Cao, Fan Zhang, Na Yin
+# Authors: Yu Cao, Na Yin, Fan Zhang
 # Date: April 2026
 # Purpose: NutriScan real-time food detection and
 #          nutrition overlay using YOLOv8 and OpenCV.

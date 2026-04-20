@@ -1,4 +1,4 @@
-# Authors: Yu Cao, Fan Zhang, Na Yin
+# Authors: Yu Cao, Na Yin, Fan Zhang
 # Date: April 2026
 # Purpose: Local nutrition database for all 194
 #          NutriScan v2 food categories. Provides
