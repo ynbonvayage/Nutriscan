@@ -1,3 +1,29 @@
 models/best.pt
 __pycache__/
 .idea/
+
+# Dataset — too large for git
+data/UECFOOD256/
+
+# Old model performance logs
+model2_performance/
+
+# Old model weights (v1 backup)
+models/best_v1.pt
+
+# v2 training output folder
+v2/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# IDE and editor configuration
+.claude/
+.vscode/
+.idea/
