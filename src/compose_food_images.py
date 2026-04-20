@@ -1,9 +1,10 @@
 # compose_food_images.py
-# Authors: Yu Cao, Na Yin, Fan Zhang
+# Authors: Yu Cao, Na Yin, Fan Zhang (alphabetical order by last name)
 # Date: April 20, 2026
-# Purpose: Compose multiple single-food images from the UEC FOOD 256 dataset
-#          into one image containing 2-3 food categories for visual demo use.
-#          Category names are loaded from a classes_v2.txt file.
+# Purpose: Compose multiple food images from the UEC FOOD 256 dataset into one
+#          image containing 2-3 food categories for visual demo use. Each food
+#          item is cropped using the bounding box annotation from bb_info.txt to
+#          ensure only the target food is included in the crop.
 #
 # Usage:
 #     python compose_food_images.py --data_dir /path/to/UECFOOD256 --classes classes_v2.txt --num_images 10
@@ -36,6 +37,51 @@ def load_class_names(classes_file):
     return class_map
 
 
+def load_bb_info(category_dir):
+    """Load bounding box annotations from bb_info.txt in a category folder.
+    The file format is: first line is a header, then each subsequent line
+    contains: <image_number> <x1> <y1> <x2> <y2> where (x1,y1) is the
+    top-left corner and (x2,y2) is the bottom-right corner.
+
+    Args:
+        category_dir (Path): Path to a category subdirectory.
+
+    Returns:
+        dict: Mapping from image filename stem (str) to list of bounding
+              boxes, where each box is a tuple (x1, y1, x2, y2).
+              e.g. {"12345": [(x1, y1, x2, y2), ...]}
+    """
+    bb_file = category_dir / "bb_info.txt"
+    bb_map = {}
+
+    if not bb_file.exists():
+        return bb_map
+
+    with open(bb_file, "r") as f:
+        for line_num, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Skip the header line (contains non-numeric first token)
+            parts = line.split()
+            if len(parts) < 5:
+                continue
+            try:
+                img_id = parts[0]
+                x1, y1, x2, y2 = int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4])
+            except ValueError:
+                # Header line or malformed line
+                continue
+
+            # Store bounding boxes grouped by image ID
+            if img_id not in bb_map:
+                bb_map[img_id] = []
+            bb_map[img_id].append((x1, y1, x2, y2))
+
+    return bb_map
+
+
 def get_category_dirs(data_dir):
     """Scan the dataset root directory and return a sorted list of category
     folder paths that contain at least one image file.
@@ -55,21 +101,51 @@ def get_category_dirs(data_dir):
     return sorted(dirs, key=lambda x: int(x.name))
 
 
-def pick_random_image(category_dir):
-    """Randomly select one image file from a given category folder.
+def pick_random_cropped_image(category_dir, bb_map):
+    """Randomly select one image from a category folder and crop it using
+    the bounding box annotation. If no bounding box is available for the
+    selected image, fall back to using the full image.
 
     Args:
         category_dir (Path): Path to a category subdirectory.
+        bb_map (dict): Bounding box mapping from load_bb_info().
 
     Returns:
-        Path: Path to the selected image file.
+        Image.Image: The cropped (or full) PIL image.
+        Path: Path to the source image file.
     """
-    # Collect all image files and filter out non-image files like bb_info.txt
+    # Collect all image files
     imgs = list(category_dir.glob("*.jpg")) + \
            list(category_dir.glob("*.png")) + \
            list(category_dir.glob("*.jpeg"))
     imgs = [p for p in imgs if p.suffix.lower() in (".jpg", ".jpeg", ".png")]
-    return random.choice(imgs)
+
+    # Shuffle and try to find an image with a valid bounding box
+    random.shuffle(imgs)
+    for img_path in imgs:
+        img_id = img_path.stem
+        img = Image.open(img_path).convert("RGB")
+
+        if img_id in bb_map and bb_map[img_id]:
+            # Use the first bounding box for this image
+            x1, y1, x2, y2 = bb_map[img_id][0]
+
+            # Clamp coordinates to image boundaries
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(img.width, x2)
+            y2 = min(img.height, y2)
+
+            # Only crop if the box is valid
+            if x2 > x1 and y2 > y1:
+                return img.crop((x1, y1, x2, y2)), img_path
+
+        # Fall back to full image if no valid bounding box
+        return img, img_path
+
+    # Should not reach here, but return first image as safety fallback
+    img_path = imgs[0]
+    return Image.open(img_path).convert("RGB"), img_path
 
 
 def compose_horizontal(images, canvas_h=400, gap=20):
@@ -147,9 +223,9 @@ def compose_grid(images, cell_size=400, gap=20):
 
 
 def main():
-    """Parse command-line arguments, load class names, select random food
-    categories and images, compose them into multi-food images, and save
-    results to disk."""
+    """Parse command-line arguments, load class names and bounding box data,
+    select random food categories, crop food regions from images, compose
+    them into multi-food images, and save results to disk."""
 
     # Set up command-line argument parser
     parser = argparse.ArgumentParser(description="Compose multi-food images from UEC FOOD 256")
@@ -186,6 +262,13 @@ def main():
         print("Error: need at least 2 category folders with images")
         return
 
+    # Preload bounding box data for all categories
+    print("Loading bounding box annotations...")
+    all_bb = {}
+    for cat_dir in category_dirs:
+        all_bb[cat_dir.name] = load_bb_info(cat_dir)
+    print("Bounding box data loaded.")
+
     # Create output directory if it does not exist
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -198,19 +281,16 @@ def main():
         # Randomly sample distinct categories
         chosen_cats = random.sample(category_dirs, n_foods)
 
-        # Load one random image from each chosen category
+        # Crop one food region from each chosen category using bounding box
         images = []
-        folder_ids = []
         food_names = []
         for cat_dir in chosen_cats:
-            img_path = pick_random_image(cat_dir)
-            img = Image.open(img_path).convert("RGB")
-            images.append(img)
-            folder_ids.append(cat_dir.name)
-            # Look up the human-readable food name from classes file
+            bb_map = all_bb[cat_dir.name]
+            cropped_img, _ = pick_random_cropped_image(cat_dir, bb_map)
+            images.append(cropped_img)
             food_names.append(class_map.get(cat_dir.name, f"unknown_{cat_dir.name}"))
 
-        # Compose images using the selected layout
+        # Compose cropped images using the selected layout
         if args.layout == "horizontal":
             composed = compose_horizontal(images)
         else:
