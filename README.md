@@ -1,6 +1,6 @@
 # NutriScan
 
-**Authors:** Yu Cao, Na Yin, Fan Zhang (alphabetical order by last name)
+**Authors:** Yu Cao, Na Yin, Fan Zhang (alphabetical order by last name)    
 **Course:** CS 5330 — Pattern Recognition and Computer Vision  
 **Date:** April 2026
 
