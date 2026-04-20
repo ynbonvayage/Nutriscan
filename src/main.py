@@ -38,23 +38,31 @@ _LABEL_OVERLAP_MARGIN = 2
 _LABEL_SHIFT_STEP = 4
 # Number of frames a detection is kept alive after
 # the model last saw it — prevents flickering
-_SMOOTH_FRAMES = 8
+_SMOOTH_FRAMES = 9  # odd number avoids tie votes
 
 
 class _DetectionCache:
     """
-    Temporal smoothing cache using rolling frame history.
+    Temporal smoothing cache using two-step majority voting.
 
-    For each box detected in the current frame, searches
-    the last max_frames frames for spatially matching boxes
-    (IoU > iou_thresh) and promotes the highest-confidence
-    label seen at that location.
+    For each box in the current frame, searches the last
+    max_frames frames for spatially matching boxes
+    (IoU > iou_thresh), then applies two-step voting:
 
-    Benefits:
-    - No ghost boxes: only current-frame boxes are rendered
-    - Flicker suppression: best historical label/conf shown
-    - False-detection suppression: low-conf misdetections
-      are overridden by high-conf historical matches
+    Step 1: Per frame — pick only the max-confidence
+            matching detection as that frame's single vote.
+    Step 2: Across frames — pick the label with the most
+            votes as the final displayed label.
+
+    Using an odd number of frames (default 9) guarantees
+    a clear winner with no tie votes.
+
+    Key properties:
+    - No ghost boxes: only current-frame boxes are shown
+    - Each frame contributes exactly 1 vote (fair weight)
+    - Suppresses one-off misdetections (minority votes)
+    - Clean food transition in ~5 frames
+    - conf and box always taken from the current frame
     """
 
     def __init__(self, max_frames: int = _SMOOTH_FRAMES,
@@ -91,13 +99,17 @@ class _DetectionCache:
 
     def get_active(self) -> list[dict]:
         """
-        Return smoothed detections based on current frame.
+        Return voted detections anchored to the current frame.
 
-        For every box in the most recent frame, scans all
-        historical frames for spatially overlapping boxes
-        (IoU > iou_thresh). Returns the label and confidence
-        of the best match found across the entire history
-        window, paired with the current-frame bounding box.
+        For each box in the most recent frame:
+          Step 1 — each historical frame nominates its single
+                   best-matching box (highest conf, IoU >
+                   iou_thresh) as one vote for that label.
+          Step 2 — the label with the most votes wins;
+                   ties broken by total accumulated confidence.
+
+        conf and box are always taken from the current frame
+        so coordinates never lag behind the live feed.
 
         Returns list of dicts: label, conf, box.
         If the current frame has no detections, returns [].
@@ -112,23 +124,44 @@ class _DetectionCache:
 
         result = []
         for det in current_frame:
-            best_label = det["label"]
-            best_conf  = det["conf"]
+            # votes[label] = (vote_count, total_conf)
+            votes: dict[str, list] = {}
 
-            # Search all past frames for matching location
+            # Current frame always casts one vote
+            lbl = det["label"]
+            votes[lbl] = [1, det["conf"]]
+
+            # Step 1: each past frame contributes one vote
             for frame in self._history[:-1]:
+                # Find the single best-matching box in this frame
+                frame_best: dict | None = None
+                frame_best_conf = -1.0
                 for hist_det in frame:
                     if _iou(det["box"], hist_det["box"]) \
                             > self.iou_thresh:
-                        # Same location — promote if better
-                        if hist_det["conf"] > best_conf:
-                            best_label = hist_det["label"]
-                            best_conf  = hist_det["conf"]
+                        if hist_det["conf"] > frame_best_conf:
+                            frame_best_conf = hist_det["conf"]
+                            frame_best = hist_det
+
+                if frame_best is not None:
+                    lbl = frame_best["label"]
+                    if lbl in votes:
+                        votes[lbl][0] += 1
+                        votes[lbl][1] += frame_best["conf"]
+                    else:
+                        votes[lbl] = [1, frame_best["conf"]]
+
+            # Step 2: label with most votes wins;
+            # tie-break by total accumulated confidence
+            winner = max(
+                votes,
+                key=lambda l: (votes[l][0], votes[l][1]),
+            )
 
             result.append({
-                "label": best_label,
-                "conf":  best_conf,
-                "box":   det["box"],
+                "label": winner,
+                "conf":  det["conf"],   # always current-frame conf
+                "box":   det["box"],    # always current-frame box
             })
 
         return result
