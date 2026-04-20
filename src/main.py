@@ -99,69 +99,91 @@ class _DetectionCache:
 
     def get_active(self) -> list[dict]:
         """
-        Return voted detections anchored to the current frame.
+        Return smoothed detections using two-step voting
+        and averaged bounding box from winning label only.
 
-        For each box in the most recent frame:
-          Step 1 — each historical frame nominates its single
-                   best-matching box (highest conf, IoU >
-                   iou_thresh) as one vote for that label.
-          Step 2 — the label with the most votes wins;
-                   ties broken by total accumulated confidence.
+        Algorithm:
+        Step 1 — Per frame: find all IoU-matching boxes,
+                 keep only the max-confidence one as that
+                 frame's single vote.
+        Step 2 — Count votes per label across all frames.
+                 The label with the most votes wins.
+        Step 3 — Collect all historical boxes whose label
+                 matches the winning label and IoU > thresh.
+                 Average their coordinates for a smooth box.
 
-        conf and box are always taken from the current frame
-        so coordinates never lag behind the live feed.
-
-        Returns list of dicts: label, conf, box.
-        If the current frame has no detections, returns [].
+        conf is always taken from the current frame.
+        Returns [] if current frame has no detections.
         """
         if not self._history:
             return []
 
-        # Only render boxes that exist in the current frame
+        # Only render boxes present in the current frame
         current_frame = self._history[-1]
         if not current_frame:
             return []
 
         result = []
         for det in current_frame:
-            # votes[label] = (vote_count, total_conf)
-            votes: dict[str, list] = {}
 
-            # Current frame always casts one vote
-            lbl = det["label"]
-            votes[lbl] = [1, det["conf"]]
+            # ── Step 1 & 2: voting ─────────────────────
+            votes: dict[str, int] = {}
 
-            # Step 1: each past frame contributes one vote
-            for frame in self._history[:-1]:
-                # Find the single best-matching box in this frame
-                frame_best: dict | None = None
-                frame_best_conf = -1.0
-                for hist_det in frame:
-                    if _iou(det["box"], hist_det["box"]) \
-                            > self.iou_thresh:
-                        if hist_det["conf"] > frame_best_conf:
-                            frame_best_conf = hist_det["conf"]
-                            frame_best = hist_det
+            for frame in self._history:
+                # Find all IoU-matching boxes in this frame
+                matching = [
+                    h for h in frame
+                    if _iou(det["box"], h["box"])
+                    > self.iou_thresh
+                ]
+                if not matching:
+                    continue
 
-                if frame_best is not None:
-                    lbl = frame_best["label"]
-                    if lbl in votes:
-                        votes[lbl][0] += 1
-                        votes[lbl][1] += frame_best["conf"]
-                    else:
-                        votes[lbl] = [1, frame_best["conf"]]
+                # One vote per frame — max confidence wins
+                best_in_frame = max(
+                    matching, key=lambda h: h["conf"]
+                )
+                lbl = best_in_frame["label"]
+                votes[lbl] = votes.get(lbl, 0) + 1
 
-            # Step 2: label with most votes wins;
-            # tie-break by total accumulated confidence
-            winner = max(
-                votes,
-                key=lambda l: (votes[l][0], votes[l][1]),
-            )
+            # Winning label — fall back to current if empty
+            if votes:
+                winning_label = max(votes, key=votes.get)
+            else:
+                winning_label = det["label"]
+
+            # ── Step 3: smooth box ─────────────────────
+            # Collect boxes from history that:
+            # 1. match by IoU > iou_thresh
+            # 2. belong to the winning label only
+            smooth_boxes: list[tuple] = []
+            for frame in self._history:
+                for h in frame:
+                    if (h["label"] == winning_label and
+                            _iou(det["box"], h["box"])
+                            > self.iou_thresh):
+                        smooth_boxes.append(h["box"])
+
+            # Average the collected boxes
+            if smooth_boxes:
+                avg_x1 = int(sum(b[0] for b in smooth_boxes)
+                             / len(smooth_boxes))
+                avg_y1 = int(sum(b[1] for b in smooth_boxes)
+                             / len(smooth_boxes))
+                avg_x2 = int(sum(b[2] for b in smooth_boxes)
+                             / len(smooth_boxes))
+                avg_y2 = int(sum(b[3] for b in smooth_boxes)
+                             / len(smooth_boxes))
+                smoothed_box = (avg_x1, avg_y1,
+                                avg_x2, avg_y2)
+            else:
+                # No history yet — use current frame box
+                smoothed_box = det["box"]
 
             result.append({
-                "label": winner,
-                "conf":  det["conf"],   # always current-frame conf
-                "box":   det["box"],    # always current-frame box
+                "label": winning_label,
+                "conf":  det["conf"],
+                "box":   smoothed_box,
             })
 
         return result
