@@ -4,9 +4,6 @@
 
 NutriScan detects food items from a live webcam feed, looks up nutritional data from a local database, and displays per-item calorie badges alongside an aggregated macronutrient summary through an OpenCV overlay.
 
-> CS 5330 Pattern Recognition and Computer Vision, Spring 2026
-> Khoury College of Computer Sciences, Northeastern University
-
 **Authors:** Yu Cao, Na Yin, Fan Zhang
 
 ## Key Results
