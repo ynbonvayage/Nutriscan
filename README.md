@@ -53,11 +53,14 @@ Download model weights from [Google Drive](https://drive.google.com/drive/folder
 # Run with trained food model
 python src/main.py
 
+# Adjust confidence threshold
+python src/main.py --conf 0.25
+
 # Preview UI with pretrained COCO model (no food weights needed)
 python src/main.py --demo
 ```
 
-Options: `--model PATH`, `--camera INDEX`, `--conf THRESHOLD`
+Options: `--model PATH` (default: `models/best.pt`), `--camera INDEX` (default: `0`), `--conf THRESHOLD` (default: `0.20`)
 
 ## Dataset
 
