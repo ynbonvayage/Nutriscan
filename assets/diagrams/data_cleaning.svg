@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 270" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<rect x="1" y="1" width="898" height="268" rx="16" fill="#F8FAFC" stroke="#E2E8F0"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#94A3B8"/></marker></defs>
+<text x="30" y="42" font-size="16" font-weight="700" fill="#0F172A">Step 1 · Remove unreliable classes</text>
+<text x="30" y="80" font-size="13" fill="#475569">255 food classes in UEC FOOD-256</text>
+<rect x="30" y="92" width="289" height="40" rx="6" fill="#3B82F6"/>
+<rect x="322" y="92" width="88" height="40" rx="6" fill="#CBD5E1"/>
+<text x="174.5" y="117" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">194 kept</text>
+<text x="366.0" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#475569">61 removed</text>
+<text x="30" y="166" font-size="13" fill="#475569">Removed because they had:</text>
+<text x="30" y="188" font-size="13" fill="#0F172A">• too few photos to learn from (15 classes, &lt; 100 images)</text>
+<text x="30" y="208" font-size="13" fill="#0F172A">• very low accuracy in v1 (46 classes, mAP &lt; 0.55)</text>
+<text x="30" y="242" font-size="13" fill="#475569">Then switch to a larger model: YOLOv8n → YOLOv8s</text>
+<line x1="450" y1="30" x2="450" y2="240" stroke="#E2E8F0" stroke-width="1.5"/>
+<text x="480" y="42" font-size="16" font-weight="700" fill="#0F172A">Step 2 · Accuracy goes up (mAP@0.5)</text>
+<text x="480" y="109" font-size="13" fill="#475569">YOLOv5 (published)</text>
+<rect x="625" y="90" width="161" height="28" rx="5" fill="#CBD5E1"/>
+<text x="794" y="109" font-size="14" fill="#475569">0.701</text>
+<text x="480" y="159" font-size="13" fill="#475569">Ours v1 · YOLOv8n</text>
+<rect x="625" y="140" width="164" height="28" rx="5" fill="#93C5FD"/>
+<text x="797" y="159" font-size="14" fill="#475569">0.711</text>
+<text x="480" y="209" font-size="13" fill="#0F172A" font-weight="700">Ours v2 · YOLOv8s</text>
+<rect x="625" y="190" width="200" height="28" rx="5" fill="#3B82F6"/>
+<text x="833" y="209" font-size="14" fill="#0F172A" font-weight="700">0.871</text>
+<text x="480" y="248" font-size="13" font-weight="700" fill="#3B82F6">+17 points over the published baseline</text>
+</svg>
