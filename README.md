@@ -60,7 +60,7 @@ Below are the four ideas that make the difference, each with the problem it solv
 **Fix:** we removed the 61 unreliable classes, kept 194, and moved to a slightly larger model.
 
 <p align="center">
-  <img src="assets/diagrams/data_cleaning.svg" width="100%" alt="255 classes split into 194 kept and 61 removed. mAP@0.5: YOLOv5 published 0.701, our v1 0.711, our v2 0.871">
+  <img src="assets/diagrams/data_cleaning.png" width="100%" alt="255 classes split into 194 kept and 61 removed. mAP@0.5: YOLOv5 published 0.701, our v1 0.711, our v2 0.871">
 </p>
 
 <details>
@@ -102,7 +102,7 @@ YOLO's own suppression only compares boxes of the same class. We run per-class N
 **Fix:** remember the last 9 frames and let each one vote. The label with the most votes is the one shown.
 
 <p align="center">
-  <img src="assets/diagrams/voting.svg" width="100%" alt="Nine frames: seven say rice, two say fried rice. Rice wins 7 to 2 and is shown on screen">
+  <img src="assets/diagrams/voting.png" width="100%" alt="Nine frames: seven say rice, two say fried rice. Rice wins 7 to 2 and is shown on screen">
 </p>
 
 <details>
